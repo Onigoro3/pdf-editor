@@ -7,11 +7,12 @@ import json
 import tempfile
 import math
 import copy
+import re  # 正規表現用
 
 class PDFEditorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Python PDF Editor (Lv.20 - 結合機能追加版)")
+        self.root.title("Python PDF Editor (Lv.30 - 注文日時順並び替え版)")
         self.root.geometry("1500x950")
 
         # --- 変数初期化 ---
@@ -55,8 +56,8 @@ class PDFEditorApp:
         tk.Button(file_frame, text="再開/テンプレ", command=self.load_project, bg="#fff9c4").pack(side=tk.LEFT, padx=1)
         tk.Button(file_frame, text="PDF保存", command=self.save_as, bg="#ffab91").pack(side=tk.LEFT, padx=1)
         tk.Button(file_frame, text="🖨印刷", command=self.print_pdf, bg="#b3e5fc").pack(side=tk.LEFT, padx=1)
-        # ★追加: 結合ボタン
-        tk.Button(file_frame, text="🔗結合", command=self.merge_pdfs, bg="#c8e6c9").pack(side=tk.LEFT, padx=1)
+        # ★変更: ボタン名を変更
+        tk.Button(file_frame, text="🔗結合(注文日時順)", command=self.merge_pdfs, bg="#c8e6c9").pack(side=tk.LEFT, padx=1)
 
         # 編集操作
         edit_ope_frame = tk.LabelFrame(toolbar, text="操作", bg="#f0f0f0")
@@ -645,7 +646,7 @@ class PDFEditorApp:
             messagebox.showinfo("成功", "再開します")
         except Exception as e: messagebox.showerror("エラー", f"読込失敗: {e}")
 
-    # ★新機能: 複数のPDFを選択して結合（発行日順）
+    # ★変更: 「注文日時」で並び替え
     def merge_pdfs(self):
         # 1. ファイル選択 (複数)
         file_paths = filedialog.askopenfilenames(
@@ -655,16 +656,36 @@ class PDFEditorApp:
         if not file_paths:
             return
 
-        # 2. ファイルごとのメタデータを取得してリスト化
+        # 日付抽出用関数（内部メソッド）
+        def get_order_date_from_text(doc_obj, filename):
+            try:
+                # 1ページ目のテキストを取得
+                page_text = doc_obj[0].get_text()
+                
+                # 正規表現で「注文日時」または「注文日」周辺の日付を探す
+                # パターン: "注文日時" または "注文日" + (記号など) + YYYY年MM月DD日 または YYYY/MM/DD
+                match = re.search(r"注文日時?\D*?(\d{4}[\/年\.-]\d{1,2}[\/月\.-]\d{1,2})", page_text)
+                
+                if match:
+                    date_str = match.group(1)
+                    # 比較用に数字だけ抽出して連結 (2025/01/01 -> 20250101)
+                    sortable_date = re.sub(r"\D", "", date_str)
+                    
+                    if len(sortable_date) == 8: return int(sortable_date)
+                    elif len(sortable_date) < 8: return int(sortable_date.ljust(8, '0')) # 簡易補正
+                    return int(sortable_date)
+            except Exception:
+                pass
+            
+            return 99999999
+
+        # 2. リスト作成
         pdf_list = []
         for path in file_paths:
             try:
                 with fitz.open(path) as doc:
-                    # 作成日(creationDate)を取得。ない場合は空文字
-                    c_date = doc.metadata.get("creationDate", "")
-                    # 日付が空の場合、ソート順で後ろに来るように "z" を入れる等の工夫も可能だが
-                    # ここでは単純に空文字として扱う（先頭に来る可能性あり）
-                    pdf_list.append({"path": path, "date": c_date})
+                    o_date = get_order_date_from_text(doc, path)
+                    pdf_list.append({"path": path, "date": o_date})
             except Exception as e:
                 print(f"Skip {path}: {e}")
                 continue
@@ -673,8 +694,7 @@ class PDFEditorApp:
             messagebox.showerror("エラー", "有効なPDFが見つかりませんでした")
             return
 
-        # 3. 発行日順（昇順）に並べ替え
-        # PDFの日付形式は通常 "D:YYYYMMDD..." なので文字列比較でソート可能
+        # 3. 注文日時順（昇順）に並べ替え
         pdf_list.sort(key=lambda x: x["date"])
 
         # 4. 結合処理
@@ -692,7 +712,7 @@ class PDFEditorApp:
             )
             if save_path:
                 merged_doc.save(save_path)
-                messagebox.showinfo("完了", f"{len(pdf_list)}ファイルを結合しました！\n（発行日が古い順）")
+                messagebox.showinfo("完了", f"{len(pdf_list)}ファイルを結合しました！\n（注文日時順）")
             
             merged_doc.close()
 

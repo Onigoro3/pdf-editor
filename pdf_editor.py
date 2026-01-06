@@ -11,7 +11,7 @@ import copy
 class PDFEditorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Python PDF Editor (Lv.15 - 最終完全版)")
+        self.root.title("Python PDF Editor (Lv.20 - 結合機能追加版)")
         self.root.geometry("1500x950")
 
         # --- 変数初期化 ---
@@ -55,6 +55,8 @@ class PDFEditorApp:
         tk.Button(file_frame, text="再開/テンプレ", command=self.load_project, bg="#fff9c4").pack(side=tk.LEFT, padx=1)
         tk.Button(file_frame, text="PDF保存", command=self.save_as, bg="#ffab91").pack(side=tk.LEFT, padx=1)
         tk.Button(file_frame, text="🖨印刷", command=self.print_pdf, bg="#b3e5fc").pack(side=tk.LEFT, padx=1)
+        # ★追加: 結合ボタン
+        tk.Button(file_frame, text="🔗結合", command=self.merge_pdfs, bg="#c8e6c9").pack(side=tk.LEFT, padx=1)
 
         # 編集操作
         edit_ope_frame = tk.LabelFrame(toolbar, text="操作", bg="#f0f0f0")
@@ -108,7 +110,6 @@ class PDFEditorApp:
         # 表示オプション
         view_frame = tk.LabelFrame(toolbar, text="表示", bg="#f0f0f0")
         view_frame.pack(side=tk.LEFT, padx=5, pady=2)
-        # ★新機能: グリッド切り替え
         self.grid_btn = tk.Button(view_frame, text="# グリッド", command=self.toggle_grid, relief=tk.RAISED)
         self.grid_btn.pack(side=tk.LEFT, padx=2)
 
@@ -140,7 +141,7 @@ class PDFEditorApp:
         self.root.bind("<Delete>", lambda e: self.delete_selection())
         self.root.bind("<Control-c>", lambda e: self.copy_selection())
         self.root.bind("<Control-v>", lambda e: self.paste_selection())
-        self.root.bind("<Control-z>", lambda e: self.undo()) # Ctrl+Z対応
+        self.root.bind("<Control-z>", lambda e: self.undo()) 
 
         # Footer
         bottom_bar = tk.Frame(root, bd=1, relief=tk.SUNKEN)
@@ -155,7 +156,6 @@ class PDFEditorApp:
     # --- Core Functions ---
     def save_state(self):
         """現在の状態を履歴に保存（Undo用）"""
-        # 深いコピーを作成して保存
         if len(self.history) > 20: self.history.pop(0)
         self.history.append(copy.deepcopy(self.annotations))
 
@@ -193,24 +193,21 @@ class PDFEditorApp:
         else: self.zoom_level = max(0.2, self.zoom_level - 0.1)
         self.show_page()
 
-    # ★新機能: グリッド描画
     def toggle_grid(self):
         self.show_grid = not self.show_grid
         if self.show_grid:
             self.grid_btn.config(relief=tk.SUNKEN, bg="#ccc")
         else:
             self.grid_btn.config(relief=tk.RAISED, bg="#f0f0f0")
-        self.show_page() # 再描画
+        self.show_page() 
 
     def draw_grid_lines(self, width, height):
         if not self.show_grid: return
         step = self.grid_size * self.zoom_level
         
-        # 縦線
         for i in range(0, int(width), int(step)):
             x = self.offset_x + i
             self.canvas.create_line(x, self.offset_y, x, self.offset_y + height, fill="#ddd", tags="grid")
-        # 横線
         for i in range(0, int(height), int(step)):
             y = self.offset_y + i
             self.canvas.create_line(self.offset_x, y, self.offset_x + width, y, fill="#ddd", tags="grid")
@@ -242,7 +239,7 @@ class PDFEditorApp:
         self.canvas.delete("all")
         self.canvas.create_image(self.offset_x, self.offset_y, image=self.image_ref, anchor=tk.NW, tags="background")
         
-        self.draw_grid_lines(img_w, img_h) # グリッド描画
+        self.draw_grid_lines(img_w, img_h) 
         
         self.canvas.config(scrollregion=(0, 0, max(canvas_width, img_w), max(canvas_height, img_h)))
         self.redraw_annotations()
@@ -257,10 +254,8 @@ class PDFEditorApp:
         py = (canvas_y - self.offset_y) * self.scale_y
         return px, py
 
-    # ★新機能: グリッド吸着計算
     def snap_value(self, val, scale):
         if not self.show_grid: return val
-        # PDF座標系でのグリッドサイズ
         grid_step = self.grid_size * scale
         return round(val / grid_step) * grid_step
 
@@ -287,19 +282,17 @@ class PDFEditorApp:
                 break
         self.shape_var.set("図形...")
 
-    # ★新機能: 画像追加
     def add_image_from_file(self):
         if not self.doc: return
         path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")])
         if not path: return
         
-        self.save_state() # Undo保存
+        self.save_state() 
         item_id = str(len(self.annotations.get(self.current_page_num, [])) + 30000)
         
-        # デフォルト位置（左上）
         data = {
             "id": item_id, "type": "image",
-            "x": 50, "y": 50, "width": 100, "height": 100, # デフォルトサイズ
+            "x": 50, "y": 50, "width": 100, "height": 100,
             "image_path": path
         }
         
@@ -334,8 +327,8 @@ class PDFEditorApp:
         cx = self.canvas.canvasx(event.x)
         cy = self.canvas.canvasy(event.y)
         if self.mode:
-            self.save_state() # Undo保存
-            px, py = self.get_snapped_pdf_coords(cx, cy) # 吸着
+            self.save_state() 
+            px, py = self.get_snapped_pdf_coords(cx, cy) 
             self.add_annotation(px, py, self.mode)
             self.mode = None
             self.canvas.config(cursor="arrow")
@@ -372,7 +365,6 @@ class PDFEditorApp:
             data["text"] = text
             data["width"] = 20 
         elif type_ == "check": data.update({"text": "✔", "width": 24})
-        # ★新機能: 白塗り
         elif type_ == "whiteout":
             data.update({"width": 50, "height": 20, "color": "#FFFFFF", "rgb": (1, 1, 1)})
         elif type_ == "triangle": data.update({"width": 30, "height": 25})
@@ -432,22 +424,18 @@ class PDFEditorApp:
             self.canvas.create_text(cx, cy, text=data["text"], fill=data["color"],
                                     font=(f_family, display_fs, f_weight), anchor=tk.NW, tags=("annot", tag))
         
-        # ★新機能: 画像描画
         elif data["type"] == "image":
             img_path = data.get("image_path")
             if img_path and os.path.exists(img_path):
-                # GC対策のため辞書に保持
                 if item_id := data["id"]:
-                    # リサイズして表示
                     try:
                         pil_img = Image.open(img_path)
-                        pil_img = pil_img.resize((int(w*2), int(h*2)), Image.LANCZOS) # 表示用
+                        pil_img = pil_img.resize((int(w*2), int(h*2)), Image.LANCZOS) 
                         tk_img = ImageTk.PhotoImage(pil_img)
                         self.photo_refs[item_id] = tk_img
                         self.canvas.create_image(cx, cy, image=tk_img, anchor=tk.NW, tags=("annot", tag))
                     except: pass
         
-        # ★新機能: 白塗り描画 (枠線なし)
         elif data["type"] == "whiteout":
             self.canvas.create_rectangle(cx, cy, cx+w, cy+h, fill="white", outline="white", tags=("annot", tag))
 
@@ -590,13 +578,12 @@ class PDFEditorApp:
         self.save_state()
         tag = f"item_{self.selected_item_id}"
         
-        # 左上基準のアイテム (テキスト, 画像, 白塗り, チェック)
         if "text" in tag or "check" in tag or "image" in tag or "whiteout" in tag:
             coords = self.canvas.coords(tag)
             if coords:
                 px, py = self.get_snapped_pdf_coords(coords[0], coords[1])
                 self.update_selected_item(lambda d: {"x": px, "y": py})
-        else: # 中心基準の図形
+        else: 
             coords = self.canvas.coords(tag)
             if len(coords) == 4:
                 center_cx = (coords[0] + coords[2]) / 2
@@ -631,24 +618,20 @@ class PDFEditorApp:
                 messagebox.showinfo("成功", "保存しました")
             except Exception as e: messagebox.showerror("エラー", f"保存失敗: {e}")
 
-    # ★新機能: テンプレート機能（別のPDFを開いた状態で、他のプロジェクトの配置だけ読み込む）
     def load_project(self):
         path = filedialog.askopenfilename(filetypes=[("Project Files", "*.json")])
         if not path: return
         try:
             with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
             
-            # PDFが既に開かれていれば、配置だけ適用するか聞く
             if self.doc:
                 if messagebox.askyesno("確認", "現在のPDFに、このプロジェクトの配置を適用しますか？\n(テンプレートとして使用)"):
-                    # 配置データをマージ
                     loaded_annots = {int(k): v for k, v in data.get("annotations", {}).items()}
-                    self.annotations = loaded_annots # 上書き（マージしたい場合はupdate）
+                    self.annotations = loaded_annots 
                     self.show_page()
                     messagebox.showinfo("完了", "配置を適用しました")
                     return
 
-            # PDFが開かれていない、または「いいえ」の場合は通常通りプロジェクトを開く
             pdf_path = data.get("pdf_path")
             if not os.path.exists(pdf_path):
                 pdf_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")], title="元のPDFが見つかりません。開くPDFを選択してください")
@@ -661,6 +644,61 @@ class PDFEditorApp:
             self.show_page()
             messagebox.showinfo("成功", "再開します")
         except Exception as e: messagebox.showerror("エラー", f"読込失敗: {e}")
+
+    # ★新機能: 複数のPDFを選択して結合（発行日順）
+    def merge_pdfs(self):
+        # 1. ファイル選択 (複数)
+        file_paths = filedialog.askopenfilenames(
+            title="結合するPDFを選択（複数可）",
+            filetypes=[("PDF Files", "*.pdf")]
+        )
+        if not file_paths:
+            return
+
+        # 2. ファイルごとのメタデータを取得してリスト化
+        pdf_list = []
+        for path in file_paths:
+            try:
+                with fitz.open(path) as doc:
+                    # 作成日(creationDate)を取得。ない場合は空文字
+                    c_date = doc.metadata.get("creationDate", "")
+                    # 日付が空の場合、ソート順で後ろに来るように "z" を入れる等の工夫も可能だが
+                    # ここでは単純に空文字として扱う（先頭に来る可能性あり）
+                    pdf_list.append({"path": path, "date": c_date})
+            except Exception as e:
+                print(f"Skip {path}: {e}")
+                continue
+        
+        if not pdf_list:
+            messagebox.showerror("エラー", "有効なPDFが見つかりませんでした")
+            return
+
+        # 3. 発行日順（昇順）に並べ替え
+        # PDFの日付形式は通常 "D:YYYYMMDD..." なので文字列比較でソート可能
+        pdf_list.sort(key=lambda x: x["date"])
+
+        # 4. 結合処理
+        try:
+            merged_doc = fitz.open()
+            for item in pdf_list:
+                with fitz.open(item["path"]) as src:
+                    merged_doc.insert_pdf(src)
+            
+            # 5. 保存
+            save_path = filedialog.asksaveasfilename(
+                title="結合したPDFを保存",
+                defaultextension=".pdf",
+                filetypes=[("PDF Files", "*.pdf")]
+            )
+            if save_path:
+                merged_doc.save(save_path)
+                messagebox.showinfo("完了", f"{len(pdf_list)}ファイルを結合しました！\n（発行日が古い順）")
+            
+            merged_doc.close()
+
+        except Exception as e:
+            messagebox.showerror("エラー", f"結合中にエラーが発生しました:\n{e}")
+
 
     def print_pdf(self):
         if not self.doc: return
@@ -678,7 +716,6 @@ class PDFEditorApp:
         if self.doc:
             path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF", "*.pdf")])
             if path: 
-                # ★新機能: パスワード設定
                 pw = None
                 if messagebox.askyesno("セキュリティ", "パスワードを設定しますか？"):
                     pw = simpledialog.askstring("パスワード", "設定するパスワードを入力:", show='*')
@@ -709,7 +746,6 @@ class PDFEditorApp:
                         fontsize = w
                         if fontsize < 1: fontsize = 1
                         
-                        # ベースライン補正
                         p_adjusted = fitz.Point(p.x, p.y + fontsize)
 
                         is_bold = d.get("bold", False)
@@ -720,14 +756,12 @@ class PDFEditorApp:
                         else:
                             page.insert_text(p_adjusted, d["text"], fontsize=fontsize, color=color)
 
-                    # ★画像書き込み
                     elif d["type"] == "image":
                         img_path = d.get("image_path")
                         if img_path and os.path.exists(img_path):
                             rect = fitz.Rect(d["x"], d["y"], d["x"]+w*2, d["y"]+h*2)
                             page.insert_image(rect, filename=img_path)
 
-                    # ★白塗り書き込み
                     elif d["type"] == "whiteout":
                         r = fitz.Rect(d["x"], d["y"], d["x"]+w, d["y"]+h)
                         page.draw_rect(r, fill=(1,1,1), color=(1,1,1))
@@ -759,7 +793,6 @@ class PDFEditorApp:
                         shape.finish(color=color, width=1.5, dashes=ls)
                         shape.commit()
             
-            # 暗号化設定
             encrypt_method = fitz.PDF_ENCRYPT_AES_256 if user_pw else fitz.PDF_ENCRYPT_KEEP
             work_doc.save(path, garbage=4, deflate=True, encryption=encrypt_method, user_pw=user_pw, owner_pw=user_pw)
             
